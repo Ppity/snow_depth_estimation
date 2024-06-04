@@ -1,15 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.lib.msfaanet import msfaa
-from model.ck import bffnet
-
-
 
 class ConvBnReLU(nn.Sequential):
-    """
-    封装conv+bn+relu
-    """
+
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation=1, relu=True):
         super(ConvBnReLU, self).__init__()
         self.add_module(
@@ -44,17 +38,11 @@ def adpLinear():
 class BasicBlock(nn.Module):
     def __init__(self, input_dim, output_dim, stride, expansion):
         super(BasicBlock, self).__init__()
-
         self.conv1 = nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=stride, padding=1)
         self.bn1 = nn.BatchNorm2d(output_dim)
         self.conv2 = nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(output_dim)
         self.short_conv = nn.Sequential()
-        # self.attention = self_attn_net(output_dim,2)
-        # self.attention = cbam_attention(output_dim)
-        # 1.如果通过这个残差块之后，输入输出的尺寸发生了变化
-        # 2.如果通过这个残差块之后，输入输出的通道数发生了变化
-        # 都需要加残差边
         if stride != 1 and input_dim != expansion * input_dim:  # expansion=2,output_channels=128,num_blocks=2,stride=2
             self.short_conv = nn.Sequential(
                 nn.Conv2d(input_dim, output_dim, kernel_size=1, stride=stride, padding=0),
@@ -90,9 +78,6 @@ class MFPANet(nn.Module):
         self.conv2_2 = ConvBnReLU(32,32, kernel_size=3, stride=2, padding=1)
         self.conv1x1 = ConvBnReLU(32,64,kernel_size=1,stride=1,padding=0)
         self.pool = nn.AvgPool2d(kernel_size=2)
-
-
-
         self.msfaa_1 = msfaa(64,128)
         self.msfaa_2 = msfaa(64,128)
         self.msfaa_3 = msfaa(128,128)
@@ -222,15 +207,15 @@ class MFPANet(nn.Module):
         out_1 = self.features_1(out_)
         out_2 = self.features_2(out_)
         out_inner = torch.cat((out_1,out_2),dim=1)
-        out_a = self.msfaa_1(out_1)    # 640,16,16
-        out_b = self.msfaa_2(out_2)    # 640,16,16
+        out_a = self.msfaa_1(out_1)  
+        out_b = self.msfaa_2(out_2)    
         out_3 = self.features_3(out_1)
         out_4 = self.features_4(out_2)
-        out_c = self.msfaa_3(out_3)   # 640,8,8
-        out_d = self.msfaa_4(out_4)   # 640,8,8
+        out_c = self.msfaa_3(out_3)  
+        out_d = self.msfaa_4(out_4)   
         out_inner = self.features_inner(out_inner)
         out_inner = self.msfaa_6(out_inner)
-        outh = out_c + out_d + out_inner  # 640,8,8
+        outh = out_c + out_d + out_inner  
         outl = out_a + out_b # 640,16,16
         out = self.cat(outh,outl)
         out = self.short(out) + out
@@ -238,7 +223,5 @@ class MFPANet(nn.Module):
         out = self.Linear(out)
 
         return out
-
-
 def net():
     return MFPANet(BasicBlock)
